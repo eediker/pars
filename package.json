@@ -1,0 +1,30 @@
+{
+  "name": "pars",
+  "version": "1.0.0",
+  "description": "pars is a hyper-fast CLI code assistant that blends extreme execution speed with a striking cyber-shamanism aesthetic. Built to sit silently in your terminal until summoned, it features sub-millisecond startup times and deep modularity.",
+  "main": "index.js",
+  "scripts": {
+    "build": "node esbuild.config.js",
+    "start": "node dist/pars.js",
+    "dev": "node esbuild.config.js && node dist/pars.js"
+  },
+  "bin": {
+    "pars": "./dist/pars.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^25.9.2",
+    "esbuild": "^0.28.0",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "boxen": "^5.1.2",
+    "chalk": "^4.1.2",
+    "commander": "^14.0.3",
+    "dotenv": "^17.4.2",
+    "gradient-string": "^3.0.0",
+    "ora": "^5.4.1"
+  }
+}
