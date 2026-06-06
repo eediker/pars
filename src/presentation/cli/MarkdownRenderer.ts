@@ -1,4 +1,3 @@
-import { marked } from 'marked';
 import { highlight } from 'cli-highlight';
 import chalk from 'chalk';
 
