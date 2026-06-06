@@ -6,7 +6,8 @@
   "scripts": {
     "build": "node esbuild.config.js",
     "start": "node dist/pars.js",
-    "dev": "node esbuild.config.js && node dist/pars.js"
+    "dev": "node esbuild.config.js && node dist/pars.js",
+    "test": "jest"
   },
   "bin": {
     "pars": "./dist/pars.js"
@@ -17,6 +18,7 @@
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
     "@types/marked": "^5.0.2",
     "@types/node": "^25.9.2",
     "esbuild": "^0.28.0",
