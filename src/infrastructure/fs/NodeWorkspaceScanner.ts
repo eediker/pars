@@ -2,7 +2,14 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 import { WorkspaceScanner, ProjectInfo } from '../../core/ports/WorkspaceScanner';
 
+interface CacheEntry {
+  mtimeMs: number;
+  dependencies: string[];
+}
+
 export class NodeWorkspaceScanner implements WorkspaceScanner {
+  private depsCache: Map<string, CacheEntry> = new Map();
+
   async scan(dirPath: string): Promise<ProjectInfo> {
     const tree = await this.buildTree(dirPath);
     const deps = await this.extractDependencies(dirPath);
@@ -17,10 +24,20 @@ export class NodeWorkspaceScanner implements WorkspaceScanner {
   private async extractDependencies(dirPath: string): Promise<string[]> {
     try {
       const packageJsonPath = path.join(dirPath, 'package.json');
+      const stat = await fs.stat(packageJsonPath);
+      const cached = this.depsCache.get(packageJsonPath);
+
+      if (cached && cached.mtimeMs === stat.mtimeMs) {
+        return cached.dependencies;
+      }
+
       const data = await fs.readFile(packageJsonPath, 'utf-8');
       const pkg = JSON.parse(data);
       const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
-      return Object.entries(allDeps).map(([name, version]) => `${name}: ${version}`);
+      const dependencies = Object.entries(allDeps).map(([name, version]) => `${name}: ${version}`);
+
+      this.depsCache.set(packageJsonPath, { mtimeMs: stat.mtimeMs, dependencies });
+      return dependencies;
     } catch {
       return [];
     }
