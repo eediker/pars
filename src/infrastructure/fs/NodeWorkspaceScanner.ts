@@ -45,19 +45,24 @@ export class NodeWorkspaceScanner implements WorkspaceScanner {
 
   private async buildTree(dirPath: string, prefix: string = '', depth: number = 0): Promise<string> {
     if (depth > 4) return ''; // limit recursion
-    let tree = '';
     try {
       const dirents = await fs.readdir(dirPath, { withFileTypes: true });
-      for (const dirent of dirents) {
-        if (['node_modules', '.git', 'dist', '.pars', 'build', 'resources', '.DS_Store'].includes(dirent.name)) continue;
-        tree += `${prefix}├── ${dirent.name}\n`;
+
+      const childrenPromises = dirents.map(async (dirent) => {
+        if (['node_modules', '.git', 'dist', '.pars', 'build', 'resources', '.DS_Store'].includes(dirent.name)) return '';
+
+        let nodeStr = `${prefix}├── ${dirent.name}\n`;
         if (dirent.isDirectory()) {
-          tree += await this.buildTree(path.join(dirPath, dirent.name), prefix + '│   ', depth + 1);
+          nodeStr += await this.buildTree(path.join(dirPath, dirent.name), prefix + '│   ', depth + 1);
         }
-      }
+        return nodeStr;
+      });
+
+      const childrenTrees = await Promise.all(childrenPromises);
+      return childrenTrees.join('');
     } catch {
       // ignore
+      return '';
     }
-    return tree;
   }
 }
