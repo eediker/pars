@@ -1,0 +1,61 @@
+:root {
+  /* Cyber-Shamanism Color Palette */
+  --bg-color: #050505;
+  --bg-panel: rgba(15, 15, 18, 0.7);
+  --bg-panel-hover: rgba(25, 25, 30, 0.9);
+  
+  --accent-cyan: #00ffcc;
+  --accent-azure: #0099ff;
+  --accent-purple: #9900ff;
+  
+  --text-primary: #f0f0f0;
+  --text-secondary: #8a8a93;
+  
+  /* Glassmorphism */
+  --glass-border: 1px solid rgba(255, 255, 255, 0.05);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+  --glass-blur: blur(12px);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  /* Subtle dark gradient background */
+  background: radial-gradient(circle at top right, #0a0a12, #050505 60%);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Base App Layout */
+#root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Animations */
+@keyframes glowPulse {
+  0% { box-shadow: 0 0 5px rgba(0, 255, 204, 0.2); }
+  50% { box-shadow: 0 0 15px rgba(0, 255, 204, 0.6); }
+  100% { box-shadow: 0 0 5px rgba(0, 255, 204, 0.2); }
+}
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

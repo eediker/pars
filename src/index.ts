@@ -3,6 +3,11 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import gradient from 'gradient-string';
 import ora from 'ora';
+import express from 'express';
+import cors from 'cors';
+import * as path from 'path';
+import * as fsNative from 'fs';
+import { spawn } from 'child_process';
 
 // Infrastructure
 import { LocalFileSystem } from './infrastructure/fs/LocalFileSystem';
@@ -170,6 +175,103 @@ program
   });
 
 program
+  .command('serve')
+  .description('Starts the Pars daemon server for the Desktop GUI.')
+  .option('-p, --port <number>', 'Port to run the server on', '3333')
+  .action(async (options) => {
+    const app = express();
+    app.use(cors());
+    app.use(express.json());
+    app.use(express.static(path.join(__dirname, '../desktop/dist')));
+
+    const llm = await getLLMProvider();
+    const chatUseCase = new ChatUseCase(llm, contextManager, fs, scanner);
+
+    app.post('/api/chat', async (req, res) => {
+      try {
+        const { query } = req.body;
+        if (!query) return res.status(400).json({ error: "Query is required" });
+
+        console.log(chalk.cyan(`\n[Pars] Received query: "${query}"`));
+        
+        const { response, modifiedFiles } = await chatUseCase.execute(query, (actionMsg) => {
+          console.log(chalk.magenta(`[Agent] ${actionMsg}`));
+        });
+        
+        console.log(chalk.green(`[Pars] Response delivered.`));
+        res.json({ response, modifiedFiles });
+      } catch (error: any) {
+        console.error(chalk.red(`[Error] ${error.message}`));
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    const port = parseInt(options.port, 10);
+    app.listen(port, () => {
+      console.log(parsGradient(`\nPars Daemon is running on http://localhost:${port}\n`));
+      console.log(chalk.cyan('Awaiting connection from the Desktop Artifact...'));
+    });
+  });
+
+program
+  .command('ui')
+  .description('Opens the Pars Desktop GUI directly in your current workspace.')
+  .action(async () => {
+    const app = express();
+    app.use(cors());
+    app.use(express.json());
+    app.use(express.static(path.join(__dirname, '../desktop/dist')));
+
+    const llm = await getLLMProvider();
+    const chatUseCase = new ChatUseCase(llm, contextManager, fs, scanner);
+
+    app.post('/api/chat', async (req, res) => {
+      try {
+        const { query } = req.body;
+        if (!query) return res.status(400).json({ error: "Query is required" });
+        console.log(chalk.cyan(`\n[Pars] Received query: "${query}"`));
+        const { response, modifiedFiles } = await chatUseCase.execute(query, (actionMsg) => {
+          console.log(chalk.magenta(`[Agent] ${actionMsg}`));
+        });
+        res.json({ response, modifiedFiles });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    app.get('/api/info', (req, res) => {
+      try {
+        const files = fsNative.readdirSync(process.cwd()).filter(f => !f.startsWith('.'));
+        res.json({ cwd: process.cwd(), files });
+      } catch (e) {
+        res.json({ cwd: process.cwd(), files: [] });
+      }
+    });
+
+    app.post('/api/close', (req, res) => {
+      console.log(chalk.magenta('\n[Pars] The ritual has been terminated by the Desktop UI.'));
+      res.json({ success: true });
+      setTimeout(() => process.exit(0), 100);
+    });
+
+    app.listen(3333, () => {
+      console.log(parsGradient(`\n[Pars] Channeling Desktop Artifact via Tauri in ${process.cwd()}...\n`));
+      console.log(chalk.cyan(`[Notice] The first invocation will compile the Rust backend. This may take a minute...\n`));
+      
+      const tauriDir = path.join(__dirname, '../desktop');
+      const tauriProcess = spawn('npx', ['tauri', 'dev'], {
+        cwd: tauriDir,
+        stdio: 'inherit'
+      });
+
+      tauriProcess.on('close', () => {
+        console.log(chalk.magenta('\n[Pars] The ritual has ended. Desktop closed.'));
+        process.exit(0);
+      });
+    });
+  });
+
+program
   .command('config <provider> <apikey>')
   .description('Securely store your API key (provider: "gemini", "openai", or "groq").')
   .action(async (provider, apikey) => {
@@ -189,5 +291,10 @@ program
       spinner.fail(chalk.red(`Failed to bind key: ${error.message}`));
     }
   });
+
+// Support 'pars .' shorthand
+if (process.argv.length === 3 && process.argv[2] === '.') {
+  process.argv[2] = 'ui';
+}
 
 program.parse();

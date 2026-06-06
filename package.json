@@ -15,6 +15,8 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@types/marked": "^5.0.2",
     "@types/node": "^25.9.2",
     "esbuild": "^0.28.0",
@@ -27,7 +29,9 @@
     "chalk": "^4.1.2",
     "cli-highlight": "^2.1.11",
     "commander": "^14.0.3",
+    "cors": "^2.8.6",
     "dotenv": "^17.4.2",
+    "express": "^5.2.1",
     "gradient-string": "^3.0.0",
     "groq-sdk": "^1.2.1",
     "marked": "^18.0.5",
