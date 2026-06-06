@@ -1,0 +1,80 @@
+name: "Release"
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest"
+            args: "--target aarch64-apple-darwin"
+            pkg_target: "node18-macos-arm64"
+            sidecar_name: "pars-daemon-aarch64-apple-darwin"
+          - platform: "macos-latest"
+            args: "--target x86_64-apple-darwin"
+            pkg_target: "node18-macos-x64"
+            sidecar_name: "pars-daemon-x86_64-apple-darwin"
+          - platform: "ubuntu-22.04"
+            args: ""
+            pkg_target: "node18-linux-x64"
+            sidecar_name: "pars-daemon-x86_64-unknown-linux-gnu"
+          - platform: "windows-latest"
+            args: ""
+            pkg_target: "node18-win-x64"
+            sidecar_name: "pars-daemon-x86_64-pc-windows-msvc.exe"
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Build Core CLI
+        run: |
+          npm install
+          npm run build
+
+      - name: Build Desktop React UI
+        run: |
+          cd desktop
+          npm install
+          npm run build
+
+      - name: Compile Native Backend Sidecar
+        run: |
+          npm install -g pkg
+          mkdir -p desktop/src-tauri/bin
+          npx pkg dist/pars.js --target ${{ matrix.pkg_target }} -o desktop/src-tauri/bin/${{ matrix.sidecar_name }}
+
+      - name: Build Tauri Desktop Executable
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Pars v${{ github.ref_name }}"
+          releaseBody: "A new ascension of the Pars Anatolian Leopard agent."
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
