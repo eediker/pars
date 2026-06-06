@@ -32,6 +32,11 @@ ${projectInfo.tree}
 Project Context:
 ${context}
 
+Before taking any action or generating a final response, you MUST deeply analyze the problem and outline your reasoning inside a <THOUGHT> block. Example:
+<THOUGHT>
+I need to check the package.json to see if React is installed before writing the component.
+</THOUGHT>
+
 If you need to read the content of a file to understand the code, you MUST output EXACTLY this block and nothing else:
 <READ>path/to/file.ts</READ>
 
@@ -115,8 +120,15 @@ When you output these tags, the system will execute the operation locally and fe
         }
       }
 
-      // If no action tags, we assume it's the final answer to the user
-      finalResponse = response;
+      // Strip out the THOUGHT tags from the final user-facing response to keep the UI clean
+      finalResponse = response.replace(/<THOUGHT>[\s\S]*?<\/THOUGHT>/g, '').trim();
+      
+      // If the response is empty after stripping thoughts, they forgot to provide a final answer!
+      if (!finalResponse) {
+         currentPrompt += response + `\nSystem: You only provided a <THOUGHT> block. You must provide a human-facing response or an action tag (<READ>, <WRITE>, <BASH>).\nPars:`;
+         continue;
+      }
+
       this.history = currentPrompt + response + '\n';
       break;
     }
