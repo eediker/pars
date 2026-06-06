@@ -239,10 +239,11 @@ program
       }
     });
 
-    app.get('/api/info', (req, res) => {
+    app.get('/api/info', async (req, res) => {
       try {
-        const files = fsNative.readdirSync(process.cwd()).filter(f => !f.startsWith('.'));
-        res.json({ cwd: process.cwd(), files });
+        const files = await fsNative.promises.readdir(process.cwd());
+        const filtered = files.filter(f => !f.startsWith('.'));
+        res.json({ cwd: process.cwd(), files: filtered });
       } catch (e) {
         res.json({ cwd: process.cwd(), files: [] });
       }
