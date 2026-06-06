@@ -22,7 +22,10 @@
     "@types/marked": "^5.0.2",
     "@types/node": "^25.9.2",
     "esbuild": "^0.28.0",
+    "jest": "^30.4.2",
     "pkg": "^5.8.1",
+    "ts-jest": "^29.4.11",
+    "ts-node": "^10.9.2",
     "typescript": "^6.0.3"
   },
   "dependencies": {

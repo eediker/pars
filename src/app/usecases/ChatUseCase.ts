@@ -17,10 +17,8 @@ export class ChatUseCase {
     private scanner: WorkspaceScanner
   ) {}
 
-  async execute(query: string, onAction?: (action: string) => void): Promise<{ response: string, modifiedFiles: string[] }> {
-    const context = await this.contextManager.retrieveContext();
-    const projectInfo = await this.scanner.scan(process.cwd());
-    const systemPrompt = `You are Pars, a hyper-fast, elite AI coding agent. Maintain a cyber-shamanism, elegant, and highly precise persona.
+  private generateSystemPrompt(projectInfo: { description: string, dependencies: string[], tree: string }, context: string): string {
+    return `You are Pars, a hyper-fast, elite AI coding agent. Maintain a cyber-shamanism, elegant, and highly precise persona.
 You have AUTONOMOUS AGENTIC CAPABILITIES. 
 
 Project Type: ${projectInfo.description}
@@ -51,6 +49,45 @@ npm run test
 </BASH>
 
 When you output these tags, the system will execute the operation locally and feed the results (or errors) back to you immediately. You can do this as many times as needed to solve the user's request before giving a final human-facing response.`;
+  }
+
+  private async handleReadAction(filePath: string, onAction?: (action: string) => void): Promise<string> {
+    if (onAction) onAction(`Reading ${filePath}...`);
+    try {
+      const content = await this.fs.readFile(filePath);
+      return `\nSystem: Contents of ${filePath}:\n${content}\nPars:`;
+    } catch (e: any) {
+      return `\nSystem: Error reading ${filePath}: ${e.message}\nPars:`;
+    }
+  }
+
+  private async handleWriteAction(filePath: string, newContent: string, modifiedFiles: Set<string>, onAction?: (action: string) => void): Promise<string> {
+    if (onAction) onAction(`Rewriting ${filePath}...`);
+    try {
+      await this.fs.writeFile(filePath, newContent);
+      modifiedFiles.add(filePath);
+      return `\nSystem: Successfully saved changes to ${filePath}.\nPars:`;
+    } catch (e: any) {
+      return `\nSystem: Error writing to ${filePath}: ${e.message}\nPars:`;
+    }
+  }
+
+  private async handleBashAction(command: string, onAction?: (action: string) => void): Promise<string> {
+    if (onAction) onAction(`Executing bash command: ${command}`);
+    try {
+      const { stdout, stderr } = await execAsync(command, { cwd: process.cwd(), timeout: 15000 });
+      return `\nSystem: Command executed successfully.\n[STDOUT]:\n${stdout}\n[STDERR]:\n${stderr}\nPars:`;
+    } catch (e: any) {
+      const isTimeout = e.killed && e.signal === 'SIGTERM';
+      const errorMsg = isTimeout ? 'Command timed out after 15 seconds. Do NOT run blocking server commands.' : e.message;
+      return `\nSystem: Command failed.\n[STDOUT]:\n${e.stdout || ''}\n[STDERR]:\n${e.stderr || ''}\n[ERROR]:\n${errorMsg}\nPars:`;
+    }
+  }
+
+  async execute(query: string, onAction?: (action: string) => void): Promise<{ response: string, modifiedFiles: string[] }> {
+    const context = await this.contextManager.retrieveContext();
+    const projectInfo = await this.scanner.scan(process.cwd());
+    const systemPrompt = this.generateSystemPrompt(projectInfo, context);
     
     // Append the user query to our ongoing session history
     this.history += `\nUser: ${query}\nPars:`;
@@ -75,49 +112,20 @@ When you output these tags, the system will execute the operation locally and fe
       
       const readMatch = response.match(/<READ>\s*(.*?)\s*<\/READ>/);
       if (readMatch) {
-        const filePath = readMatch[1];
-        if (onAction) onAction(`Reading ${filePath}...`);
-        try {
-          const content = await this.fs.readFile(filePath);
-          currentPrompt += response + `\nSystem: Contents of ${filePath}:\n${content}\nPars:`;
-          continue;
-        } catch (e: any) {
-          currentPrompt += response + `\nSystem: Error reading ${filePath}: ${e.message}\nPars:`;
-          continue;
-        }
+        currentPrompt += response + await this.handleReadAction(readMatch[1], onAction);
+        continue;
       }
 
       const writeMatch = response.match(/<WRITE path="(.*?)">\n?([\s\S]*?)<\/WRITE>/);
       if (writeMatch) {
-        const filePath = writeMatch[1];
-        const newContent = writeMatch[2];
-        if (onAction) onAction(`Rewriting ${filePath}...`);
-        try {
-          await this.fs.writeFile(filePath, newContent);
-          modifiedFiles.add(filePath);
-          currentPrompt += response + `\nSystem: Successfully saved changes to ${filePath}.\nPars:`;
-          continue;
-        } catch (e: any) {
-          currentPrompt += response + `\nSystem: Error writing to ${filePath}: ${e.message}\nPars:`;
-          continue;
-        }
+        currentPrompt += response + await this.handleWriteAction(writeMatch[1], writeMatch[2], modifiedFiles, onAction);
+        continue;
       }
 
       const bashMatch = response.match(/<BASH>\n?([\s\S]*?)<\/BASH>/);
       if (bashMatch) {
-        const command = bashMatch[1].trim();
-        if (onAction) onAction(`Executing bash command: ${command}`);
-        try {
-          // Timeout set to 15 seconds to prevent freezing on long-running tasks like "npm start"
-          const { stdout, stderr } = await execAsync(command, { cwd: process.cwd(), timeout: 15000 });
-          currentPrompt += response + `\nSystem: Command executed successfully.\n[STDOUT]:\n${stdout}\n[STDERR]:\n${stderr}\nPars:`;
-          continue;
-        } catch (e: any) {
-          const isTimeout = e.killed && e.signal === 'SIGTERM';
-          const errorMsg = isTimeout ? 'Command timed out after 15 seconds. Do NOT run blocking server commands.' : e.message;
-          currentPrompt += response + `\nSystem: Command failed.\n[STDOUT]:\n${e.stdout || ''}\n[STDERR]:\n${e.stderr || ''}\n[ERROR]:\n${errorMsg}\nPars:`;
-          continue;
-        }
+        currentPrompt += response + await this.handleBashAction(bashMatch[1].trim(), onAction);
+        continue;
       }
 
       // Strip out the THOUGHT tags from the final user-facing response to keep the UI clean
