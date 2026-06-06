@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { LLMProvider } from '../../core/ports/LLMProvider';
+import { REFACTOR_SYSTEM_PROMPT } from '../../core/constants/prompts';
 
 export class OpenAIProvider implements LLMProvider {
   private client: OpenAI;
@@ -22,7 +23,7 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   async refactor(code: string, instructions: string): Promise<string> {
-    const systemPrompt = `You are an elite system architect and senior developer. Your task is to refactor the provided code according to the instructions. Return ONLY the newly refactored code without any markdown block quotes (like \`\`\`typescript), explanations, or conversational text.`;
+    const systemPrompt = REFACTOR_SYSTEM_PROMPT;
     
     const userPrompt = `Instructions:\n${instructions}\n\nCode to refactor:\n${code}`;
     
