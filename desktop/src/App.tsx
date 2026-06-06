@@ -70,10 +70,10 @@ function App() {
     <div className="app-container">
       
       {/* Sleek Antigravity Title Bar */}
-      <div className="title-bar data-tauri-drag-region">
-        <div className="title-left data-tauri-drag-region">
-          <img src="/parslogo.png" alt="Pars" className={`logo ${isLoading ? 'glowing' : ''}`} />
-          <h1 className="app-title data-tauri-drag-region">Pars</h1>
+      <div className="title-bar" data-tauri-drag-region="true">
+        <div className="title-left" data-tauri-drag-region="true">
+          <img src="/parslogo.png" alt="Pars" className={`logo ${isLoading ? 'glowing' : ''}`} data-tauri-drag-region="true" />
+          <h1 className="app-title" data-tauri-drag-region="true">Pars</h1>
         </div>
 
         <div className="window-controls">
