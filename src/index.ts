@@ -8,6 +8,7 @@ import cors from 'cors';
 import * as path from 'path';
 import * as fsNative from 'fs';
 import { spawn } from 'child_process';
+import * as crypto from 'crypto';
 
 // Infrastructure
 import { LocalFileSystem } from './infrastructure/fs/LocalFileSystem';
@@ -179,10 +180,21 @@ program
   .description('Starts the Pars daemon server for the Desktop GUI.')
   .option('-p, --port <number>', 'Port to run the server on', '3333')
   .action(async (options) => {
+    const uiToken = crypto.randomBytes(32).toString('hex');
+
     const app = express();
     app.use(cors());
     app.use(express.json());
     app.use(express.static(path.join(__dirname, '../desktop/dist')));
+
+    // Authentication middleware
+    app.use('/api', (req, res, next) => {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || authHeader !== `Bearer ${uiToken}`) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      next();
+    });
 
     const llm = await getLLMProvider();
     const chatUseCase = new ChatUseCase(llm, contextManager, fs, scanner);
@@ -217,10 +229,21 @@ program
   .command('ui')
   .description('Opens the Pars Desktop GUI directly in your current workspace.')
   .action(async () => {
+    const uiToken = crypto.randomBytes(32).toString('hex');
+
     const app = express();
     app.use(cors());
     app.use(express.json());
     app.use(express.static(path.join(__dirname, '../desktop/dist')));
+
+    // Authentication middleware
+    app.use('/api', (req, res, next) => {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || authHeader !== `Bearer ${uiToken}`) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      next();
+    });
 
     const llm = await getLLMProvider();
     const chatUseCase = new ChatUseCase(llm, contextManager, fs, scanner);
@@ -262,7 +285,11 @@ program
       const tauriDir = path.join(__dirname, '../desktop');
       const tauriProcess = spawn('npx', ['tauri', 'dev'], {
         cwd: tauriDir,
-        stdio: 'inherit'
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          VITE_PARS_TOKEN: uiToken
+        }
       });
 
       tauriProcess.on('close', () => {

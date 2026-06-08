@@ -32,7 +32,10 @@ function App() {
     try {
       const response = await fetch('http://localhost:3333/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_PARS_TOKEN}`
+        },
         body: JSON.stringify({ query })
       });
 
@@ -57,7 +60,12 @@ function App() {
 
   const handleClose = async () => {
     // Kill the daemon backend first
-    fetch('http://localhost:3333/api/close', { method: 'POST' }).catch(() => {});
+    fetch('http://localhost:3333/api/close', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_PARS_TOKEN}`
+      }
+    }).catch(() => {});
     // Kill the Tauri UI Window
     await appWindow.close();
   };
