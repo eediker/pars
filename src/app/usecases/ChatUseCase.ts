@@ -7,6 +7,48 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
+// Security: Whitelist of allowed commands
+const ALLOWED_COMMANDS = new Set([
+  'npm', 'npx', 'yarn', 'pnpm',
+  'node', 'tsc', 'jest',
+  'ls', 'cat', 'pwd', 'echo', 'grep', 'find', 'mkdir', 'rm', 'cp', 'mv', 'touch',
+  'git'
+]);
+
+// Security: Check for shell meta-characters that could allow command chaining, redirection, etc.
+// Exclude basic arguments like -v, --version, but prevent `node -e`, etc.
+// Additionally, block newlines (\n, \r) as they can be used to chain commands in exec
+const DANGEROUS_CHARS = /[&|;`<>$]/;
+const NEWLINE_CHARS = /[\n\r]/;
+
+export function isCommandSecure(command: string): { secure: boolean, reason?: string } {
+  if (!command || typeof command !== 'string') return { secure: false, reason: 'Empty command' };
+
+  // Check for dangerous characters
+  if (DANGEROUS_CHARS.test(command)) {
+    return { secure: false, reason: 'Command contains forbidden shell characters' };
+  }
+
+  // Explicitly check for newlines which act as command separators in exec
+  if (NEWLINE_CHARS.test(command)) {
+    return { secure: false, reason: 'Command contains newlines which can bypass security checks' };
+  }
+
+  const parts = command.trim().split(/\s+/);
+  const baseCmd = parts[0];
+
+  if (!ALLOWED_COMMANDS.has(baseCmd)) {
+    return { secure: false, reason: `Command '${baseCmd}' is not allowed` };
+  }
+
+  // Prevent running eval with node
+  if (baseCmd === 'node' && (parts.includes('-e') || parts.includes('--eval'))) {
+    return { secure: false, reason: 'node -e/--eval is not allowed' };
+  }
+
+  return { secure: true };
+}
+
 export class ChatUseCase {
   private history: string = '';
 
@@ -106,6 +148,14 @@ When you output these tags, the system will execute the operation locally and fe
       const bashMatch = response.match(/<BASH>\n?([\s\S]*?)<\/BASH>/);
       if (bashMatch) {
         const command = bashMatch[1].trim();
+
+        const securityCheck = isCommandSecure(command);
+        if (!securityCheck.secure) {
+          if (onAction) onAction(`Blocked insecure command: ${command}`);
+          currentPrompt += response + `\nSystem: Command execution blocked for security reasons: ${securityCheck.reason}.\nPars:`;
+          continue;
+        }
+
         if (onAction) onAction(`Executing bash command: ${command}`);
         try {
           // Timeout set to 15 seconds to prevent freezing on long-running tasks like "npm start"
