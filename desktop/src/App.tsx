@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { appWindow } from '@tauri-apps/api/window';
+import { readTextFile } from '@tauri-apps/api/fs';
+import { homeDir, join } from '@tauri-apps/api/path';
 import './App.css';
 
 interface Message {
@@ -17,6 +19,17 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
+  const getAuthToken = async () => {
+    try {
+      const home = await homeDir();
+      const authPath = await join(home, '.pars', 'auth.json');
+      const content = await readTextFile(authPath);
+      return JSON.parse(content).token;
+    } catch {
+      return '';
+    }
+  };
+
   useEffect(() => {
     endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
@@ -30,9 +43,13 @@ function App() {
     setIsLoading(true);
 
     try {
+      const token = await getAuthToken();
       const response = await fetch('http://localhost:3333/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ query })
       });
 
@@ -44,8 +61,9 @@ function App() {
         content: data.response,
         modifiedFiles: data.modifiedFiles 
       }]);
-    } catch (err: any) {
-      setMessages(prev => [...prev, { role: 'pars', content: `**Error:** ${err.message}` }]);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setMessages(prev => [...prev, { role: 'pars', content: `**Error:** ${errorMessage}` }]);
     } finally {
       setIsLoading(false);
     }
@@ -57,7 +75,13 @@ function App() {
 
   const handleClose = async () => {
     // Kill the daemon backend first
-    fetch('http://localhost:3333/api/close', { method: 'POST' }).catch(() => {});
+    const token = await getAuthToken();
+    fetch('http://localhost:3333/api/close', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    }).catch(() => {});
     // Kill the Tauri UI Window
     await appWindow.close();
   };

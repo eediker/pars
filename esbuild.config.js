@@ -7,6 +7,6 @@ esbuild.build({
   target: 'node18',
   outfile: 'dist/pars.js',
   minify: true, // For extreme speed
-  external: ['esbuild'], // Don't bundle esbuild
+  external: ['esbuild', 'web-streams-polyfill', 'express'], // Don't bundle esbuild
   logLevel: 'info',
 }).catch(() => process.exit(1));

@@ -8,6 +8,8 @@ import cors from 'cors';
 import * as path from 'path';
 import * as fsNative from 'fs';
 import { spawn } from 'child_process';
+import crypto from 'crypto';
+import * as os from 'os';
 
 // Infrastructure
 import { LocalFileSystem } from './infrastructure/fs/LocalFileSystem';
@@ -217,10 +219,23 @@ program
   .command('ui')
   .description('Opens the Pars Desktop GUI directly in your current workspace.')
   .action(async () => {
+    const parsToken = crypto.randomBytes(16).toString('hex');
+    const parsDir = path.join(os.homedir(), '.pars');
+    if (!fsNative.existsSync(parsDir)) fsNative.mkdirSync(parsDir, { recursive: true });
+    fsNative.writeFileSync(path.join(parsDir, 'auth.json'), JSON.stringify({ token: parsToken }));
+
     const app = express();
     app.use(cors());
     app.use(express.json());
     app.use(express.static(path.join(__dirname, '../desktop/dist')));
+
+    app.use('/api', (req, res, next) => {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || authHeader !== `Bearer ${parsToken}`) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      next();
+    });
 
     const llm = await getLLMProvider();
     const chatUseCase = new ChatUseCase(llm, contextManager, fs, scanner);
